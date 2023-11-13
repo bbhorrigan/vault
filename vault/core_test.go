@@ -254,12 +254,12 @@ func TestNewCore_configureLogRequestLevel(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			// We need to supply a logger, as configureLogRequestLevel emits
+			// We need to supply a logger, as configureLogRequestsLevel emits
 			// warnings to the logs in certain circumstances.
 			core := &Core{
 				logger: corehelpers.NewTestLogger(t),
 			}
-			core.configureLogRequestLevel(tc.level)
+			core.configureLogRequestsLevel(tc.level)
 			require.Equal(t, tc.expectedLevel, log.Level(core.logRequestsLevel.Load()))
 		})
 	}
@@ -3359,5 +3359,53 @@ func InduceDeadlock(t *testing.T, vaultcore *Core, expected uint32) {
 	wg.Wait()
 	if atomic.LoadUint32(&deadlocks) != expected {
 		t.Fatalf("expected 1 deadlock, detected %d", deadlocks)
+	}
+}
+
+func TestExpiration_DeadlockDetection(t *testing.T) {
+	testCore := TestCore(t)
+	testCoreUnsealed(t, testCore)
+
+	if testCore.expiration.DetectDeadlocks() {
+		t.Fatal("expiration has deadlock detection enabled, it shouldn't")
+	}
+
+	testCore = TestCoreWithDeadlockDetection(t, nil, false)
+	testCoreUnsealed(t, testCore)
+
+	if !testCore.expiration.DetectDeadlocks() {
+		t.Fatal("expiration doesn't have deadlock detection enabled, it should")
+	}
+}
+
+func TestQuotas_DeadlockDetection(t *testing.T) {
+	testCore := TestCore(t)
+	testCoreUnsealed(t, testCore)
+
+	if testCore.quotaManager.DetectDeadlocks() {
+		t.Fatal("quotas has deadlock detection enabled, it shouldn't")
+	}
+
+	testCore = TestCoreWithDeadlockDetection(t, nil, false)
+	testCoreUnsealed(t, testCore)
+
+	if !testCore.quotaManager.DetectDeadlocks() {
+		t.Fatal("quotas doesn't have deadlock detection enabled, it should")
+	}
+}
+
+func TestStatelock_DeadlockDetection(t *testing.T) {
+	testCore := TestCore(t)
+	testCoreUnsealed(t, testCore)
+
+	if testCore.DetectStateLockDeadlocks() {
+		t.Fatal("statelock has deadlock detection enabled, it shouldn't")
+	}
+
+	testCore = TestCoreWithDeadlockDetection(t, nil, false)
+	testCoreUnsealed(t, testCore)
+
+	if !testCore.DetectStateLockDeadlocks() {
+		t.Fatal("statelock doesn't have deadlock detection enabled, it should")
 	}
 }
